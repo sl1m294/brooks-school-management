@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  GRADUATED
+  TRANSFERRED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  WITHDRAWN
+  TRANSFERRED
+}
+
+enum GuardianRelationship {
+  MOTHER
+  FATHER
+  GUARDIAN
+  GRANDPARENT
+  SIBLING
+  OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  HALF_DAY
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PASSWORD_CHANGE
+  ATTENDANCE_MARKED
+  GRADE_RECORDED
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique @db.VarChar(255)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+  firstName    String     @map("first_name") @db.VarChar(100)
+  lastName     String     @map("last_name") @db.VarChar(100)
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  teacher       Teacher?
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @map("token_hash") @unique @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Student {
+  id             String        @id @default(uuid()) @db.Uuid
+  studentNumber  String        @unique @map("student_number") @db.VarChar(50)
+  firstName      String        @map("first_name") @db.VarChar(100)
+  lastName       String        @map("last_name") @db.VarChar(100)
+  dateOfBirth    DateTime      @map("date_of_birth") @db.Date
+  gender         Gender
+  addressLine1   String        @map("address_line_1") @db.VarChar(255)
+  addressLine2   String?       @map("address_line_2") @db.VarChar(255)
+  city           String        @db.VarChar(100)
+  stateProvince  String        @map("state_province") @db.VarChar(100)
+  postalCode     String        @map("postal_code") @db.VarChar(30)
+  country        String        @default("Kenya") @db.VarChar(100)
+  email          String?       @db.VarChar(255)
+  phone          String?       @db.VarChar(50)
+  enrollmentDate DateTime      @map("enrollment_date") @db.Date
+  gradeLevel     Int           @map("grade_level")
+  currentSection String?       @map("current_section") @db.VarChar(20)
+  status         StudentStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  guardians   StudentGuardian[]
+  enrollments Enrollment[]
+  grades      Grade[]
+  attendance  Attendance[]
+
+  @@index([lastName, firstName])
+  @@index([gradeLevel, currentSection])
+  @@index([status])
+  @@map("students")
+}
+
+model Guardian {
+  id            String   @id @default(uuid()) @db.Uuid
+  firstName     String   @map("first_name") @db.VarChar(100)
+  lastName      String   @map("last_name") @db.VarChar(100)
+  email         String?  @db.VarChar(255)
+  phonePrimary  String   @map("phone_primary") @db.VarChar(50)
+  phoneSecondary String? @map("phone_secondary") @db.VarChar(50)
+  addressLine1  String?  @map("address_line_1") @db.VarChar(255)
+  addressLine2  String?  @map("address_line_2") @db.VarChar(255)
+  city          String?  @db.VarChar(100)
+  stateProvince String?  @map("state_province") @db.VarChar(100)
+  postalCode    String?  @map("postal_code") @db.VarChar(30)
+  country       String?  @db.VarChar(100)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  students StudentGuardian[]
+
+  @@index([lastName, firstName])
+  @@index([email])
+  @@map("guardians")
+}
+
+model StudentGuardian {
+  studentId    String               @map("student_id") @db.Uuid
+  guardianId   String               @map("guardian_id") @db.Uuid
+  relationship GuardianRelationship
+  isPrimary    Boolean              @default(false) @map("is_primary")
+  canPickup    Boolean              @default(true) @map("can_pickup")
+  emergencyContactPriority Int?     @map("emergency_contact_priority")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, guardianId])
+  @@index([guardianId])
+  @@map("student_guardians")
+}
+
+model Teacher {
+  id             String    @id @default(uuid()) @db.Uuid
+  employeeNumber String    @unique @map("employee_number") @db.VarChar(50)
+  userId         String?   @unique @map("user_id") @db.Uuid
+  firstName      String    @map("first_name") @db.VarChar(100)
+  lastName       String    @map("last_name") @db.VarChar(100)
+  email          String    @unique @db.VarChar(255)
+  phone          String?   @db.VarChar(50)
+  hireDate       DateTime  @map("hire_date") @db.Date
+  department     String?   @db.VarChar(100)
+  status         UserStatus @default(ACTIVE)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignments TeacherAssignment[]
+
+  @@index([lastName, firstName])
+  @@index([status])
+  @@map("teachers")
+}
+
+model Class {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(100)
+  gradeLevel   Int      @map("grade_level")
+  section      String   @db.VarChar(20)
+  academicYear String   @map("academic_year") @db.VarChar(20)
+  room         String?  @db.VarChar(50)
+  capacity     Int?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  enrollments   Enrollment[]
+  classSubjects ClassSubject[]
+  attendance    Attendance[]
+
+  @@unique([gradeLevel, section, academicYear])
+  @@index([academicYear])
+  @@map("classes")
+}
+
+model Subject {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(30)
+  name        String   @db.VarChar(120)
+  description String?
+  creditHours Decimal? @map("credit_hours") @db.Decimal(4, 2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  classSubjects ClassSubject[]
+
+  @@index([name])
+  @@map("subjects")
+}
+
+model ClassSubject {
+  id        String   @id @default(uuid()) @db.Uuid
+  classId   String   @map("class_id") @db.Uuid
+  subjectId String   @map("subject_id") @db.Uuid
+  term      String   @db.VarChar(50)
+  weight    Decimal  @default(1.0) @db.Decimal(5, 2)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  class       Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  assignments TeacherAssignment[]
+  grades      Grade[]
+
+  @@unique([classId, subjectId, term])
+  @@index([subjectId])
+  @@map("class_subjects")
+}
+
+model TeacherAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  teacherId      String    @map("teacher_id") @db.Uuid
+  classSubjectId String    @map("class_subject_id") @db.Uuid
+  startsOn       DateTime  @map("starts_on") @db.Date
+  endsOn         DateTime? @map("ends_on") @db.Date
+  isLead         Boolean   @default(true) @map("is_lead")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  teacher      Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, classSubjectId, startsOn])
+  @@index([classSubjectId])
+  @@map("teacher_assignments")
+}
+
+model Enrollment {
+  id         String           @id @default(uuid()) @db.Uuid
+  studentId  String           @map("student_id") @db.Uuid
+  classId    String           @map("class_id") @db.Uuid
+  status     EnrollmentStatus @default(ACTIVE)
+  startsOn   DateTime         @map("starts_on") @db.Date
+  endsOn     DateTime?        @map("ends_on") @db.Date
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  student     Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  schoolClass Class   @relation(fields: [classId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, classId, startsOn])
+  @@index([classId, status])
+  @@index([studentId, status])
+  @@map("enrollments")
+}
+
+model Grade {
+  id             String   @id @default(uuid()) @db.Uuid
+  studentId      String   @map("student_id") @db.Uuid
+  classSubjectId String   @map("class_subject_id") @db.Uuid
+  title          String   @db.VarChar(150)
+  score          Decimal  @db.Decimal(6, 2)
+  maxScore       Decimal  @map("max_score") @db.Decimal(6, 2)
+  weight         Decimal  @default(1.0) @db.Decimal(5, 2)
+  gradedOn       DateTime @map("graded_on") @db.Date
+  comments       String?
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, gradedOn])
+  @@index([classSubjectId])
+  @@map("grades")
+}
+
+model Attendance {
+  id        String           @id @default(uuid()) @db.Uuid
+  studentId String           @map("student_id") @db.Uuid
+  classId   String           @map("class_id") @db.Uuid
+  date      DateTime         @db.Date
+  status    AttendanceStatus
+  notes     String?
+  markedById String?         @map("marked_by_id") @db.Uuid
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  student     Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  schoolClass Class   @relation(fields: [classId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, classId, date])
+  @@index([classId, date])
+  @@index([studentId, date])
+  @@map("attendance")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid()) @db.Uuid
+  actorId    String?     @map("actor_id") @db.Uuid
+  action     AuditAction
+  entityType String      @map("entity_type") @db.VarChar(100)
+  entityId   String?     @map("entity_id") @db.VarChar(100)
+  metadata   Json?
+  ipAddress  String?     @map("ip_address") @db.VarChar(100)
+  userAgent  String?     @map("user_agent")
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
