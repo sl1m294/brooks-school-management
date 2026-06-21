@@ -2,15 +2,14 @@
   "version": 2,
   "buildCommand": "npm run vercel-build",
   "functions": {
-    "src/index.js": {
+    "api/index.js": {
       "maxDuration": 10
     }
   },
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/src/index.js"
+      "destination": "/api/index.js"
     }
   ]
 }
-
