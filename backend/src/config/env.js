@@ -40,4 +40,9 @@ if (
   process.exit(1);
 }
 
-export const env = parsed.data;
+export const env = {
+  ...parsed.data,
+  CORS_ORIGINS: parsed.data.CORS_ORIGIN.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+};

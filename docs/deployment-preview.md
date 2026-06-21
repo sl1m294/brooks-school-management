@@ -4,20 +4,20 @@ This guide is for putting the current app online so the school manager can revie
 
 ## Recommended Preview Setup
 
-Use Render for all three parts:
+Use Vercel for the preview frontend and backend, plus a hosted PostgreSQL database such as Neon or Supabase:
 
-1. PostgreSQL database
-2. Backend web service
-3. Frontend static site
+1. Vercel frontend project from `frontend`
+2. Vercel backend/API project from `backend`
+3. Free hosted Postgres database
 
-This keeps the first deployment simpler because everything lives in one dashboard.
+Vercel is strongest for the frontend, but this app still needs PostgreSQL for login, students, guardians, and exam results.
 
 ## Domain Plan
 
 - Public app: `https://brooksschool.sc.ke`
 - API: `https://api.brooksschool.sc.ke`
 
-For the first manager preview, it is also okay to use the temporary Render URLs first, then connect the custom domain after the manager has seen it.
+For the first manager preview, use the temporary Vercel URLs first, then connect the custom domain after the manager has seen it.
 
 ## Before Deploying
 
@@ -29,15 +29,15 @@ Recommended repository name:
 brooks-school-management
 ```
 
-## Render Services
+## Vercel Preview Services
 
 ### 1. PostgreSQL
 
-Create a Render Postgres database.
+Create a free Postgres database using Neon, Supabase, or a Vercel Postgres integration.
 
-Use the internal database URL as `DATABASE_URL` for the backend service.
+Copy its pooled connection string as `DATABASE_URL` for the backend project.
 
-### 2. Backend Web Service
+### 2. Backend API Project
 
 Root directory:
 
@@ -48,26 +48,25 @@ backend
 Build command:
 
 ```text
-npm install && npx prisma generate && npx prisma migrate deploy
+npm run vercel-build
 ```
 
-Start command:
+Framework preset:
 
 ```text
-npm start
+Other
 ```
 
 Environment variables:
 
 ```text
 NODE_ENV=production
-PORT=10000
-DATABASE_URL=<Render internal database URL>
+DATABASE_URL=<hosted Postgres pooled connection string>
 JWT_ACCESS_SECRET=<long random secret>
 JWT_REFRESH_SECRET=<long random secret>
 JWT_ACCESS_EXPIRES_IN=8h
 JWT_REFRESH_EXPIRES_IN=7d
-CORS_ORIGIN=https://brooksschool.sc.ke
+CORS_ORIGIN=<frontend Vercel URL>,https://brooksschool.sc.ke
 PRODUCTION_DOMAIN=brooksschool.sc.ke
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX=300
@@ -75,13 +74,13 @@ SEED_ADMIN_EMAIL=<real admin email>
 SEED_ADMIN_PASSWORD=<temporary strong password>
 ```
 
-After the backend deploys, run a one-off job or shell command:
+After the backend deploys, run seed locally against the hosted database or use Vercel CLI with the backend environment variables:
 
 ```text
 npm run prisma:seed
 ```
 
-### 3. Frontend Static Site
+### 3. Frontend Project
 
 Root directory:
 
@@ -104,14 +103,14 @@ dist
 Environment variables:
 
 ```text
-VITE_API_BASE_URL=https://api.brooksschool.sc.ke
+VITE_API_BASE_URL=<backend Vercel URL>
 ```
 
-If using temporary Render URLs first, set `VITE_API_BASE_URL` to the backend Render URL.
+After custom domains are connected, change it to `https://api.brooksschool.sc.ke`.
 
 ## DNS Records
 
-Add the custom domain in Render first. Render will show the DNS records to create.
+Add the custom domain in Vercel first. Vercel will show the DNS records to create.
 
 Expected shape:
 
@@ -130,4 +129,3 @@ For the manager preview:
 - Do not add real children, parents, phone numbers, or exam records yet.
 - Share only with the manager.
 - Change the seeded admin password after first login.
-

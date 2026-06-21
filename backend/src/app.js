@@ -16,8 +16,15 @@ export const createApp = () => {
   app.use(helmet());
   app.use(
     cors({
-      origin: env.CORS_ORIGIN,
-      credentials: true
+      origin(origin, callback) {
+        if (!origin || env.CORS_ORIGINS.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error("Not allowed by CORS"));
+      },
+      credentials: false
     })
   );
   app.use(express.json({ limit: "1mb" }));
