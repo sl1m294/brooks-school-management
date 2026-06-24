@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import {
   ArrowUpRight,
@@ -18,9 +18,9 @@ import "./styles.css";
 const awards = ["CBC Ready", "Parent Partnership", "Safe Campus", "Values Led"];
 
 const stats = [
-  ["18+", "Learning clubs and co-curricular pathways"],
-  ["24", "Learners per stream target for personal attention"],
-  ["4", "Core pillars: academics, values, creativity, care"]
+  [18, "+", "Learning clubs and co-curricular pathways"],
+  [24, "", "Learners per stream target for personal attention"],
+  [4, "", "Core pillars: academics, values, creativity, care"]
 ];
 
 const approach = [
@@ -115,6 +115,63 @@ function useClock() {
   return time;
 }
 
+function useCountUp(target, isActive) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    if (!isActive) return undefined;
+
+    let frameId;
+    const duration = 1400;
+    const startedAt = performance.now();
+
+    const tick = (now) => {
+      const progress = Math.min((now - startedAt) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(target * eased));
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [target, isActive]);
+
+  return value;
+}
+
+function AnimatedNumber({ target, suffix = "" }) {
+  const [isActive, setIsActive] = useState(false);
+  const numberRef = useRef(null);
+  const count = useCountUp(target, isActive);
+
+  useEffect(() => {
+    if (!numberRef.current || isActive) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsActive(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.4 }
+    );
+
+    observer.observe(numberRef.current);
+    return () => observer.disconnect();
+  }, [isActive]);
+
+  return (
+    <span ref={numberRef}>
+      {count}
+      {suffix}
+    </span>
+  );
+}
+
 function SlidingButton({ href, children, light = false }) {
   return (
     <a className={light ? "slide-button light" : "slide-button"} href={href}>
@@ -161,8 +218,8 @@ function Hero() {
 
         <div className="hero-image-wrap" data-reveal>
           <img
-            src="https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=1300&q=85"
-            alt="Learners in a bright primary classroom"
+            src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1300&q=85"
+            alt="Primary school learners working with their teacher"
           />
         </div>
 
@@ -203,9 +260,11 @@ function About() {
         </SlidingButton>
       </div>
       <div className="stat-stack">
-        {stats.map(([value, label]) => (
+        {stats.map(([value, suffix, label]) => (
           <article key={label} data-reveal>
-            <h2>{value}</h2>
+            <h2>
+              <AnimatedNumber target={value} suffix={suffix} />
+            </h2>
             <p>{label}</p>
           </article>
         ))}
