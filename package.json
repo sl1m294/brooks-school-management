@@ -7,7 +7,9 @@
     "dev": "npm --workspace backend run dev",
     "dev:backend": "npm --workspace backend run dev",
     "dev:frontend": "npm --workspace frontend run dev",
+    "dev:website": "npm --workspace website run dev",
     "build:frontend": "npm --workspace frontend run build",
+    "build:website": "npm --workspace website run build",
     "prisma:generate": "npm --workspace backend run prisma:generate",
     "prisma:migrate": "npm --workspace backend run prisma:migrate",
     "prisma:seed": "npm --workspace backend run prisma:seed",
@@ -15,6 +17,7 @@
   },
   "workspaces": [
     "backend",
-    "frontend"
+    "frontend",
+    "website"
   ]
 }
