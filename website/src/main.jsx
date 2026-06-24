@@ -186,16 +186,25 @@ function Navigation() {
 
   return (
     <header className="topbar">
-      <button className="menu-pill" aria-label="Open menu">
-        <Menu size={18} />
-        <span>Menu</span>
-      </button>
-      <a className="wordmark" href="#top" aria-label="Brooks School home">
-        Brooks School
-      </a>
-      <div className="place-time">
-        <span>/ Nairobi, Kenya -</span>
-        <span>{time}</span>
+      <div className="nav-panel">
+        <button className="menu-pill" aria-label="Open menu">
+          <Menu size={18} />
+          <span>Menu</span>
+        </button>
+        <a className="wordmark" href="#top" aria-label="Brooks School home">
+          <span className="school-mark">B</span>
+          <span>Brooks School</span>
+        </a>
+        <div className="nav-right">
+          <div className="place-time">
+            <span>Nairobi, Kenya</span>
+            <span>{time}</span>
+          </div>
+          <a className="admission-link" href="#contact">
+            Admissions
+            <ArrowUpRight size={16} />
+          </a>
+        </div>
       </div>
     </header>
   );
