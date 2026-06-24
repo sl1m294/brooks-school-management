@@ -1,76 +1,53 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import {
   ArrowUpRight,
   BookOpen,
   CalendarDays,
-  CheckCircle2,
-  ChevronRight,
   GraduationCap,
   HeartHandshake,
   Mail,
   MapPin,
   Menu,
-  Newspaper,
   Phone,
   ShieldCheck,
-  Sparkles,
-  Trophy,
-  UsersRound
+  Sparkles
 } from "lucide-react";
 import "./styles.css";
 
-const recognition = ["CBC Ready", "Parent Partnership", "Values Led", "Safe Campus"];
+const awards = ["CBC Ready", "Parent Partnership", "Safe Campus", "Values Led"];
 
 const stats = [
-  ["18+", "Learning clubs"],
-  ["24", "Learners per stream target"],
-  ["4", "Core value pillars"]
+  ["18+", "Learning clubs and co-curricular pathways"],
+  ["24", "Learners per stream target for personal attention"],
+  ["4", "Core pillars: academics, values, creativity, care"]
 ];
 
 const approach = [
   {
-    title: "Discover",
+    title: "Research",
     tag: "Foundation",
-    progress: "30%",
-    text: "We learn each child's strengths, home context, language confidence, and classroom needs before setting academic goals."
+    progress: "30% complete",
+    text: "We understand each learner's strengths, home context, reading level, confidence, and support needs before setting goals."
   },
   {
-    title: "Guide",
+    title: "Build & Guide",
     tag: "Daily Practice",
-    progress: "70%",
-    text: "Teachers combine clear lessons, reading routines, numeracy practice, creative projects, and close feedback for steady growth."
+    progress: "70% complete",
+    text: "Teachers use clear routines, strong literacy and numeracy practice, creative projects, feedback, and respectful classroom culture."
   },
   {
-    title: "Celebrate",
+    title: "Report & Grow",
     tag: "Parent Loop",
-    progress: "100%",
-    text: "Parents receive simple updates, exam results, attendance insights, and next steps they can understand without education jargon."
+    progress: "100% complete",
+    text: "Parents receive simple updates, attendance notes, exam results, calendar reminders, and next steps they can act on."
   }
 ];
 
 const programs = [
-  {
-    title: "Lower Primary",
-    meta: "PP1 to Class 3",
-    text: "Reading, number sense, Kiswahili confidence, play-based discovery, hygiene routines, and kind classroom habits.",
-    image:
-      "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=900&q=80"
-  },
-  {
-    title: "Upper Primary",
-    meta: "Class 4 to Class 6",
-    text: "Stronger writing, sciences, social studies, digital literacy, leadership roles, and CBC portfolio readiness.",
-    image:
-      "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=900&q=80"
-  },
-  {
-    title: "Clubs & Talent",
-    meta: "After class",
-    text: "Music, football, debate, art, environmental care, coding basics, and mentorship for confident self-expression.",
-    image:
-      "https://images.unsplash.com/photo-1529390079861-591de354faf5?auto=format&fit=crop&w=900&q=80"
-  }
+  ["Lower Primary", "PP1 to Class 3", "Reading, Kiswahili confidence, number sense, play-based discovery, and kind classroom habits."],
+  ["Upper Primary", "Class 4 to Class 6", "Writing, sciences, social studies, digital basics, leadership roles, and CBC portfolio readiness."],
+  ["Clubs & Talent", "After class", "Music, football, debate, art, environmental care, coding basics, and guided self-expression."]
 ];
 
 const updates = [
@@ -80,11 +57,13 @@ const updates = [
 ];
 
 function App() {
+  useRevealAnimation();
+
   return (
     <main className="site-shell">
       <Navigation />
       <Hero />
-      <RecognitionStrip />
+      <AwardMarquee />
       <About />
       <Approach />
       <Programs />
@@ -95,97 +74,139 @@ function App() {
   );
 }
 
-function Navigation() {
+function useRevealAnimation() {
+  useEffect(() => {
+    const elements = document.querySelectorAll("[data-reveal]");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.18 }
+    );
+
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, []);
+}
+
+function useClock() {
+  const [time, setTime] = useState("");
+
+  useEffect(() => {
+    const tick = () => {
+      setTime(
+        new Intl.DateTimeFormat("en-KE", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: "Africa/Nairobi"
+        }).format(new Date())
+      );
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000 * 30);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return time;
+}
+
+function SlidingButton({ href, children, light = false }) {
   return (
-    <header className="nav">
-      <a className="brand" href="#top" aria-label="Brooks School home">
-        <span className="brand-mark">B</span>
-        <span>Brooks School</span>
-      </a>
-      <nav className="nav-links" aria-label="Main navigation">
-        <a href="#about">About</a>
-        <a href="#learning">Learning</a>
-        <a href="#updates">Updates</a>
-        <a href="#contact">Contact</a>
-      </nav>
-      <a className="nav-action" href="#contact">
-        Admissions <ArrowUpRight size={17} />
-      </a>
-      <button className="menu-button" aria-label="Open menu">
-        <Menu size={22} />
+    <a className={light ? "slide-button light" : "slide-button"} href={href}>
+      <span>{children}</span>
+      <span>{children}</span>
+    </a>
+  );
+}
+
+function Navigation() {
+  const time = useClock();
+
+  return (
+    <header className="topbar">
+      <button className="menu-pill" aria-label="Open menu">
+        <Menu size={18} />
+        <span>Menu</span>
       </button>
+      <a className="wordmark" href="#top" aria-label="Brooks School home">
+        Brooks School
+      </a>
+      <div className="place-time">
+        <span>/ Nairobi, Kenya -</span>
+        <span>{time}</span>
+      </div>
     </header>
   );
 }
 
 function Hero() {
   return (
-    <section id="top" className="hero section-grid">
-      <div className="hero-kicker">
-        <span>/ Nairobi, Kenya</span>
-        <span>Primary School</span>
+    <section id="top" className="hero-dark">
+      <div className="hero-name" data-reveal>
+        <h1>Brooks</h1>
+        <p>A caring Kenyan primary school crafting confident learners, clear parent communication, and a warm daily rhythm.</p>
       </div>
-      <div className="hero-title">
-        <p className="eyebrow">Official School Website</p>
-        <h1>
-          Brooks
-          <br />
-          School
-        </h1>
-      </div>
-      <div className="hero-card">
-        <img
-          src="https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=900&q=80"
-          alt="Primary school learners in a bright classroom"
-        />
-        <div>
-          <p>
-            A caring Kenyan primary school helping children grow in academics,
-            character, creativity, and confidence.
-          </p>
-          <a href="#about">
-            Our Story <ChevronRight size={18} />
-          </a>
+
+      <div className="hero-bottom">
+        <div className="client-block" data-reveal>
+          <strong>520+</strong>
+          <span>Families served through learning, care, and values.</span>
+          <SlidingButton href="#about">Our Story</SlidingButton>
         </div>
-      </div>
-      <div className="hero-stat">
-        <strong>Parent-ready</strong>
-        <span>Simple updates, clear results, and approachable communication.</span>
+
+        <div className="hero-image-wrap" data-reveal>
+          <img
+            src="https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=1300&q=85"
+            alt="Learners in a bright primary classroom"
+          />
+        </div>
+
+        <div className="hero-badges" data-reveal>
+          <span>1ST CHOICE</span>
+          <span>PARENT READY</span>
+          <span>CBC ALIGNED</span>
+        </div>
       </div>
     </section>
   );
 }
 
-function RecognitionStrip() {
+function AwardMarquee() {
+  const repeated = [...awards, ...awards, ...awards];
+
   return (
-    <section className="recognition" aria-label="School highlights">
-      {recognition.map((item) => (
-        <div key={item}>
-          <Trophy size={18} />
-          <span>{item}</span>
-        </div>
-      ))}
+    <section className="award-stage" aria-label="School highlights">
+      <div className="award-track">
+        {repeated.map((award, index) => (
+          <article key={`${award}-${index}`}>
+            <strong>{award}</strong>
+            <p>{index % 2 === 0 ? "Brooks School 2026" : "For growing learners"}</p>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
 
 function About() {
   return (
-    <section id="about" className="about section-grid">
-      <div>
-        <p className="eyebrow">About Brooks</p>
-        <h2>Designed for children, clear for parents.</h2>
+    <section id="about" className="about-dark">
+      <div className="side-copy" data-reveal>
+        <p>Redefining primary school communication with a parent-friendly public website and a learner-first school culture.</p>
+        <SlidingButton href="#learning" light>
+          About Brooks
+        </SlidingButton>
       </div>
-      <p className="lead">
-        Brooks School blends strong classroom routines with a warm community feel.
-        Learners are known by name, parents are kept close to progress, and every
-        school day is shaped around safety, respect, curiosity, and effort.
-      </p>
-      <div className="stat-row">
+      <div className="stat-stack">
         {stats.map(([value, label]) => (
-          <article key={label}>
-            <strong>{value}</strong>
-            <span>{label}</span>
+          <article key={label} data-reveal>
+            <h2>{value}</h2>
+            <p>{label}</p>
           </article>
         ))}
       </div>
@@ -195,16 +216,18 @@ function About() {
 
 function Approach() {
   return (
-    <section id="learning" className="approach">
-      <div className="section-heading">
-        <p className="eyebrow">Our Approach</p>
-        <h2>Structured learning with a human touch.</h2>
+    <section id="learning" className="process">
+      <div className="section-title" data-reveal>
+        <p>Process</p>
+        <h2>Our Approach</h2>
+        <span>We provide thoughtful learning support adapted for every class and every home.</span>
       </div>
-      <div className="approach-grid">
+
+      <div className="process-grid">
         {approach.map((item) => (
-          <article className="approach-card" key={item.title}>
+          <article className="process-card" key={item.title} data-reveal>
             <div>
-              <span>{item.progress} complete</span>
+              <span>{item.progress}</span>
               <strong>{item.tag}</strong>
             </div>
             <h3>{item.title}</h3>
@@ -218,20 +241,23 @@ function Approach() {
 
 function Programs() {
   return (
-    <section className="programs">
-      <div className="section-heading">
-        <p className="eyebrow">Learning Pathways</p>
-        <h2>Every class has a clear rhythm.</h2>
+    <section className="program-showcase">
+      <div className="section-title" data-reveal>
+        <p>Learning</p>
+        <h2>Featured Pathways</h2>
+        <span>Public information parents can scan quickly before visiting or calling the school.</span>
       </div>
-      <div className="program-grid">
-        {programs.map((program) => (
-          <article className="program-card" key={program.title}>
-            <img src={program.image} alt="" />
+
+      <div className="program-list">
+        {programs.map(([title, meta, text], index) => (
+          <article key={title} data-reveal>
+            <span>{String(index + 1).padStart(2, "0")}</span>
             <div>
-              <span>{program.meta}</span>
-              <h3>{program.title}</h3>
-              <p>{program.text}</p>
+              <p>{meta}</p>
+              <h3>{title}</h3>
             </div>
+            <p>{text}</p>
+            <ArrowUpRight size={24} />
           </article>
         ))}
       </div>
@@ -241,17 +267,17 @@ function Programs() {
 
 function Updates() {
   return (
-    <section id="updates" className="updates section-grid">
-      <div>
-        <p className="eyebrow">School Updates</p>
-        <h2>What families should know next.</h2>
+    <section id="updates" className="updates-dark">
+      <div className="section-title" data-reveal>
+        <p>Updates</p>
+        <h2>School News</h2>
       </div>
       <div className="update-list">
         {updates.map(([date, title]) => (
-          <article key={title}>
+          <article key={title} data-reveal>
             <span>{date}</span>
             <p>{title}</p>
-            <ArrowUpRight size={20} />
+            <ArrowUpRight size={24} />
           </article>
         ))}
       </div>
@@ -268,22 +294,25 @@ function ParentPromise() {
   ];
 
   return (
-    <section className="promise">
-      <div className="promise-panel">
+    <section className="promise-dark">
+      <div className="promise-image" data-reveal>
+        <img
+          src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1200&q=85"
+          alt="Open books in a school library"
+        />
+      </div>
+      <div className="promise-copy" data-reveal>
         <Sparkles size={24} />
         <h2>A school website parents can actually use.</h2>
-        <p>
-          Public news, admissions guidance, school calendar, contacts, learning
-          information, and parent resources will live here as the site grows.
-        </p>
-      </div>
-      <div className="promise-grid">
-        {items.map(([Icon, label]) => (
-          <div key={label}>
-            <Icon size={22} />
-            <span>{label}</span>
-          </div>
-        ))}
+        <p>Admissions, term dates, updates, learning information, contacts, and parent resources will live here as the official website grows.</p>
+        <div>
+          {items.map(([Icon, label]) => (
+            <span key={label}>
+              <Icon size={18} />
+              {label}
+            </span>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -291,27 +320,23 @@ function ParentPromise() {
 
 function Contact() {
   return (
-    <footer id="contact" className="contact">
-      <div>
-        <p className="eyebrow">Contact</p>
+    <footer id="contact" className="footer-dark">
+      <div data-reveal>
+        <p>Start Here</p>
         <h2>Visit Brooks School or speak with admissions.</h2>
       </div>
-      <div className="contact-grid">
+      <div className="contact-links" data-reveal>
         <a href="tel:+254700000000">
-          <Phone size={19} />
-          +254 700 000 000
+          <Phone size={18} /> +254 700 000 000
         </a>
         <a href="mailto:info@brooksschool.sc.ke">
-          <Mail size={19} />
-          info@brooksschool.sc.ke
+          <Mail size={18} /> info@brooksschool.sc.ke
         </a>
         <a href="https://brooksschool.sc.ke">
-          <MapPin size={19} />
-          brooksschool.sc.ke
+          <MapPin size={18} /> brooksschool.sc.ke
         </a>
         <a href="#updates">
-          <CalendarDays size={19} />
-          View school calendar
+          <CalendarDays size={18} /> View school calendar
         </a>
       </div>
       <div className="footer-bottom">
