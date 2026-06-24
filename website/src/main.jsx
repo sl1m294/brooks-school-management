@@ -201,7 +201,7 @@ function Navigation() {
             <span>{time}</span>
           </div>
           <a className="admission-link" href="#contact">
-            Admissions
+            <span>Admissions</span>
             <ArrowUpRight size={16} />
           </a>
         </div>
