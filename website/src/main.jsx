@@ -227,8 +227,8 @@ function Hero() {
 
         <div className="hero-image-wrap" data-reveal>
           <img
-            src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1300&q=85"
-            alt="Primary school learners working with their teacher"
+            src="https://images.unsplash.com/photo-1620969910995-4bbe4eaa32c1?auto=format&fit=crop&fm=jpg&q=80&w=1600"
+            alt="Learners in red uniforms seated in a classroom"
           />
         </div>
 
