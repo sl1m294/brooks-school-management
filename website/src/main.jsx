@@ -270,27 +270,41 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [websiteEvents, setWebsiteEvents] = useState(events);
+  const [websiteNews, setWebsiteNews] = useState(news);
 
   useRevealAnimation(page);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadEvents() {
+    async function loadContent() {
       try {
-        const response = await fetch("/api/events");
-        if (!response.ok) return;
-        const body = await response.json();
-        const nextEvents = Array.isArray(body.data)
-          ? body.data.map((event) => [event.date, event.title, event.description])
+        const [eventsResponse, newsResponse] = await Promise.all([
+          fetch("/api/events"),
+          fetch("/api/news"),
+        ]);
+        if (!eventsResponse.ok || !newsResponse.ok) return;
+        const eventsBody = await eventsResponse.json();
+        const newsBody = await newsResponse.json();
+        const nextEvents = Array.isArray(eventsBody.data)
+          ? eventsBody.data.map((event) => [event.date, event.title, event.description])
+          : [];
+        const nextNews = Array.isArray(newsBody.data)
+          ? newsBody.data.map((item) => [
+              item.title,
+              item.date,
+              item.category,
+              item.description,
+            ])
           : [];
         if (isMounted && nextEvents.length) setWebsiteEvents(nextEvents);
+        if (isMounted && nextNews.length) setWebsiteNews(nextNews);
       } catch {
-        // Keep the built-in events if the website API is not configured yet.
+        // Keep the built-in content if the website API is not configured yet.
       }
     }
 
-    loadEvents();
+    loadContent();
 
     const onEventsUpdated = (event) => {
       const nextEvents = event.detail?.events;
@@ -298,11 +312,26 @@ function App() {
         setWebsiteEvents(nextEvents.map((item) => [item.date, item.title, item.description]));
       }
     };
+    const onNewsUpdated = (event) => {
+      const nextNews = event.detail?.news;
+      if (Array.isArray(nextNews) && nextNews.length) {
+        setWebsiteNews(
+          nextNews.map((item) => [
+            item.title,
+            item.date,
+            item.category,
+            item.description,
+          ]),
+        );
+      }
+    };
 
     window.addEventListener("website-events-updated", onEventsUpdated);
+    window.addEventListener("website-news-updated", onNewsUpdated);
     return () => {
       isMounted = false;
       window.removeEventListener("website-events-updated", onEventsUpdated);
+      window.removeEventListener("website-news-updated", onNewsUpdated);
     };
   }, []);
 
@@ -339,7 +368,12 @@ function App() {
           onClose={() => setMenuOpen(false)}
         />
       )}
-      <PageRouter page={page} onNavigate={navigate} events={websiteEvents} />
+      <PageRouter
+        page={page}
+        onNavigate={navigate}
+        events={websiteEvents}
+        news={websiteNews}
+      />
       <SiteFooter onNavigate={navigate} />
       <button
         className="back-to-top"
@@ -560,16 +594,16 @@ function MenuOverlay({ currentPage, onNavigate, onClose }) {
   );
 }
 
-function PageRouter({ page, onNavigate, events }) {
+function PageRouter({ page, onNavigate, events, news }) {
   const route = {
-    home: <HomePage onNavigate={onNavigate} events={events} />,
+    home: <HomePage onNavigate={onNavigate} events={events} news={news} />,
     about: <AboutPage />,
     academics: <AcademicsPage />,
     admissions: <AdmissionsPage onNavigate={onNavigate} />,
     "school-life": <SchoolLifePage />,
     gallery: <GalleryPage />,
     parents: <ParentsPage />,
-    news: <NewsPage events={events} />,
+    news: <NewsPage events={events} news={news} />,
     facilities: <FacilitiesPage />,
     downloads: <DownloadsPage />,
     contact: <ContactPage />,
@@ -589,14 +623,14 @@ function SlidingButton({ children, onClick, variant = "light" }) {
   );
 }
 
-function HomePage({ onNavigate, events }) {
+function HomePage({ onNavigate, events, news }) {
   return (
     <>
       <Hero onNavigate={onNavigate} />
       <HighlightMarquee />
       <StatsSection />
       <WhyChooseUs />
-      <NewsEventsBlock onNavigate={onNavigate} events={events} />
+      <NewsEventsBlock onNavigate={onNavigate} events={events} news={news} />
       <Testimonials />
       <CallToAction onNavigate={onNavigate} />
     </>
@@ -724,7 +758,7 @@ function WhyChooseUs() {
   );
 }
 
-function NewsEventsBlock({ onNavigate, events }) {
+function NewsEventsBlock({ onNavigate, events, news }) {
   return (
     <section id="news-preview" className="split-section">
       <div data-reveal>
@@ -1011,7 +1045,7 @@ function ParentsPage() {
   );
 }
 
-function NewsPage({ events }) {
+function NewsPage({ events, news }) {
   return (
     <SubPage
       eyebrow="News & Events"
@@ -1031,7 +1065,7 @@ function NewsPage({ events }) {
         ))}
       </div>
       <div className="article-grid">
-        {news.concat(news).map(([title, date, category, text], index) => (
+        {news.map(([title, date, category, text], index) => (
           <article key={`${title}-${index}`} data-reveal>
             <span>{category}</span>
             <h3>{title}</h3>
@@ -1209,8 +1243,17 @@ function WebsiteAdminPage() {
   const [token, setToken] = useState(() =>
     window.localStorage.getItem("brooks_website_admin_token") || "",
   );
+  const [activeEditor, setActiveEditor] = useState("events");
   const [adminEvents, setAdminEvents] = useState(
     events.map(([date, title, description]) => ({ date, title, description })),
+  );
+  const [adminNews, setAdminNews] = useState(
+    news.map(([title, date, category, description]) => ({
+      title,
+      date,
+      category,
+      description,
+    })),
   );
   const [status, setStatus] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -1219,16 +1262,28 @@ function WebsiteAdminPage() {
     if (!token) return undefined;
     let isMounted = true;
 
-    async function loadAdminEvents() {
-      setStatus("Loading events...");
+    async function loadAdminContent() {
+      setStatus("Loading website content...");
       try {
-        const response = await fetch("/api/admin-events", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || "Could not load events.");
+        const [eventsResponse, newsResponse] = await Promise.all([
+          fetch("/api/admin-events", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("/api/admin-news", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+        const eventsBody = await eventsResponse.json();
+        const newsBody = await newsResponse.json();
+        if (!eventsResponse.ok) {
+          throw new Error(eventsBody.error || "Could not load events.");
+        }
+        if (!newsResponse.ok) {
+          throw new Error(newsBody.error || "Could not load news.");
+        }
         if (isMounted) {
-          setAdminEvents(body.data);
+          setAdminEvents(eventsBody.data);
+          setAdminNews(newsBody.data);
           setStatus("");
         }
       } catch (error) {
@@ -1236,7 +1291,7 @@ function WebsiteAdminPage() {
       }
     }
 
-    loadAdminEvents();
+    loadAdminContent();
     return () => {
       isMounted = false;
     };
@@ -1270,6 +1325,14 @@ function WebsiteAdminPage() {
     );
   };
 
+  const updateNews = (index, field, value) => {
+    setAdminNews((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
   const addEvent = () => {
     setAdminEvents((current) => [
       ...current,
@@ -1277,8 +1340,19 @@ function WebsiteAdminPage() {
     ]);
   };
 
+  const addNews = () => {
+    setAdminNews((current) => [
+      ...current,
+      { title: "", date: "", category: "Administration", description: "" },
+    ]);
+  };
+
   const removeEvent = (index) => {
     setAdminEvents((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const removeNews = (index) => {
+    setAdminNews((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const saveEvents = async (event) => {
@@ -1310,6 +1384,35 @@ function WebsiteAdminPage() {
     }
   };
 
+  const saveNews = async (event) => {
+    event.preventDefault();
+    setIsSaving(true);
+    setStatus("Saving latest news...");
+    try {
+      const response = await fetch("/api/admin-news", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ news: adminNews }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Could not save news.");
+      setAdminNews(body.data);
+      window.dispatchEvent(
+        new CustomEvent("website-news-updated", {
+          detail: { news: body.data },
+        }),
+      );
+      setStatus("News saved. The public website will now show the new list.");
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const logout = () => {
     window.localStorage.removeItem("brooks_website_admin_token");
     setToken("");
@@ -1317,14 +1420,14 @@ function WebsiteAdminPage() {
   };
 
   return (
-    <SubPage eyebrow="Website Admin" title="Update public website events.">
+    <SubPage eyebrow="Website Admin" title="Update public website content.">
       <section className="website-admin-panel">
         <div className="admin-intro" data-reveal>
           <img src={logo} alt="Brooks School logo" />
-          <h2>Upcoming Events Editor</h2>
+          <h2>Website Content Editor</h2>
           <p>
             This page is separate from the school management app. It is only for
-            updating public website content like upcoming events.
+            updating public website content like upcoming events and latest news.
           </p>
         </div>
 
@@ -1344,59 +1447,166 @@ function WebsiteAdminPage() {
             {status ? <p className="admin-status">{status}</p> : null}
           </form>
         ) : (
-          <form className="events-editor" onSubmit={saveEvents} data-reveal>
-            {adminEvents.map((item, index) => (
-              <article key={`${item.title}-${index}`}>
-                <div>
-                  <span>Event {index + 1}</span>
-                  <button type="button" onClick={() => removeEvent(index)}>
-                    Remove
-                  </button>
-                </div>
-                <label>
-                  Date
-                  <input
-                    value={item.date}
-                    onChange={(event) => updateEvent(index, "date", event.target.value)}
-                    placeholder="02 Jul"
-                    required
-                  />
-                </label>
-                <label>
-                  Title
-                  <input
-                    value={item.title}
-                    onChange={(event) => updateEvent(index, "title", event.target.value)}
-                    placeholder="Parent consultation morning"
-                    required
-                  />
-                </label>
-                <label>
-                  Description
-                  <textarea
-                    value={item.description}
-                    onChange={(event) =>
-                      updateEvent(index, "description", event.target.value)
-                    }
-                    placeholder="Short event description"
-                    required
-                  />
-                </label>
-              </article>
-            ))}
-            <div className="admin-actions">
-              <button type="button" onClick={addEvent}>
-                Add event
+          <div className="admin-editor-wrap" data-reveal>
+            <div className="admin-category-tabs" aria-label="Website content categories">
+              <button
+                className={activeEditor === "events" ? "is-active" : ""}
+                type="button"
+                onClick={() => setActiveEditor("events")}
+              >
+                Upcoming Events
               </button>
-              <button type="submit" disabled={isSaving}>
-                {isSaving ? "Saving..." : "Publish events"}
-              </button>
-              <button type="button" onClick={logout}>
-                Log out
+              <button
+                className={activeEditor === "news" ? "is-active" : ""}
+                type="button"
+                onClick={() => setActiveEditor("news")}
+              >
+                Latest News
               </button>
             </div>
-            {status ? <p className="admin-status">{status}</p> : null}
-          </form>
+
+            {activeEditor === "events" ? (
+              <form className="events-editor" onSubmit={saveEvents}>
+                <div className="admin-section-heading">
+                  <h3>Upcoming Events</h3>
+                  <p>Short dated items shown in the Upcoming Events card.</p>
+                </div>
+                {adminEvents.map((item, index) => (
+                  <article key={`${item.title}-${index}`}>
+                    <div>
+                      <span>Event {index + 1}</span>
+                      <button type="button" onClick={() => removeEvent(index)}>
+                        Remove
+                      </button>
+                    </div>
+                    <label>
+                      Date
+                      <input
+                        value={item.date}
+                        onChange={(event) =>
+                          updateEvent(index, "date", event.target.value)
+                        }
+                        placeholder="02 Jul"
+                        required
+                      />
+                    </label>
+                    <label>
+                      Title
+                      <input
+                        value={item.title}
+                        onChange={(event) =>
+                          updateEvent(index, "title", event.target.value)
+                        }
+                        placeholder="Parent consultation morning"
+                        required
+                      />
+                    </label>
+                    <label>
+                      Description
+                      <textarea
+                        value={item.description}
+                        onChange={(event) =>
+                          updateEvent(index, "description", event.target.value)
+                        }
+                        placeholder="Short event description"
+                        required
+                      />
+                    </label>
+                  </article>
+                ))}
+                <div className="admin-actions">
+                  <button type="button" onClick={addEvent}>
+                    Add event
+                  </button>
+                  <button type="submit" disabled={isSaving}>
+                    {isSaving ? "Saving..." : "Publish events"}
+                  </button>
+                  <button type="button" onClick={logout}>
+                    Log out
+                  </button>
+                </div>
+                {status ? <p className="admin-status">{status}</p> : null}
+              </form>
+            ) : (
+              <form className="events-editor" onSubmit={saveNews}>
+                <div className="admin-section-heading">
+                  <h3>Latest News</h3>
+                  <p>Announcements shown in Latest News and News & Events.</p>
+                </div>
+                {adminNews.map((item, index) => (
+                  <article key={`${item.title}-${index}`}>
+                    <div>
+                      <span>News {index + 1}</span>
+                      <button type="button" onClick={() => removeNews(index)}>
+                        Remove
+                      </button>
+                    </div>
+                    <label>
+                      Category
+                      <select
+                        value={item.category}
+                        onChange={(event) =>
+                          updateNews(index, "category", event.target.value)
+                        }
+                        required
+                      >
+                        <option>Administration</option>
+                        <option>Academics</option>
+                        <option>Admissions</option>
+                        <option>School Life</option>
+                        <option>Parents</option>
+                      </select>
+                    </label>
+                    <label>
+                      Date
+                      <input
+                        value={item.date}
+                        onChange={(event) =>
+                          updateNews(index, "date", event.target.value)
+                        }
+                        placeholder="June 28, 2026"
+                        required
+                      />
+                    </label>
+                    <label>
+                      Title
+                      <input
+                        value={item.title}
+                        onChange={(event) =>
+                          updateNews(index, "title", event.target.value)
+                        }
+                        placeholder="Term 2 Opening Update"
+                        required
+                      />
+                    </label>
+                    <label>
+                      Description
+                      <textarea
+                        value={item.description}
+                        onChange={(event) =>
+                          updateNews(index, "description", event.target.value)
+                        }
+                        placeholder="Short announcement text"
+                        required
+                      />
+                    </label>
+                  </article>
+                ))}
+                <div className="admin-actions">
+                  <button type="button" onClick={addNews}>
+                    Add news
+                  </button>
+                  <button type="submit" disabled={isSaving}>
+                    {isSaving ? "Saving..." : "Publish news"}
+                  </button>
+                  <button type="button" onClick={logout}>
+                    Log out
+                  </button>
+                </div>
+                {status ? <p className="admin-status">{status}</p> : null}
+              </form>
+            )}
+          </div>
         )}
       </section>
     </SubPage>

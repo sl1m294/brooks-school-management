@@ -21,6 +21,30 @@ export const defaultEvents = [
   },
 ];
 
+export const defaultNews = [
+  {
+    title: "Term 2 Opening Update",
+    date: "June 28, 2026",
+    category: "Administration",
+    description:
+      "Parents are reminded to review the term calendar, uniform checklist, and arrival routines.",
+  },
+  {
+    title: "CBC Project Showcase",
+    date: "July 5, 2026",
+    category: "Academics",
+    description:
+      "Learners will present class projects in science, agriculture, creative arts, and ICT.",
+  },
+  {
+    title: "Inter-House Games Day",
+    date: "July 19, 2026",
+    category: "School Life",
+    description:
+      "Families are invited for athletics, football, teamwork activities, and class displays.",
+  },
+];
+
 let pool;
 
 export function getPool() {
@@ -60,6 +84,34 @@ export async function ensureEventsTable(client) {
           values ($1, $2, $3, $4, true)
         `,
         [event.date, event.title, event.description, index],
+      );
+    }
+  }
+}
+
+export async function ensureNewsTable(client) {
+  await client.query(`
+    create table if not exists website_news (
+      id serial primary key,
+      title varchar(180) not null,
+      news_date varchar(60) not null,
+      category varchar(80) not null,
+      description text not null,
+      display_order integer not null default 0,
+      is_published boolean not null default true,
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  const { rows } = await client.query("select count(*)::int as count from website_news");
+  if (rows[0]?.count === 0) {
+    for (const [index, item] of defaultNews.entries()) {
+      await client.query(
+        `
+          insert into website_news (title, news_date, category, description, display_order, is_published)
+          values ($1, $2, $3, $4, $5, true)
+        `,
+        [item.title, item.date, item.category, item.description, index],
       );
     }
   }

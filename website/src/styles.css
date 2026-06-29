@@ -1560,6 +1560,7 @@ th {
 
 .admin-login-form input,
 .events-editor input,
+.events-editor select,
 .events-editor textarea {
   width: 100%;
   border: 1px solid rgba(7, 20, 47, 0.12);
@@ -1576,6 +1577,52 @@ th {
 .events-editor textarea {
   min-height: 104px;
   resize: vertical;
+}
+
+.admin-editor-wrap {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid rgba(7, 20, 47, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.admin-category-tabs button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--navy);
+  background: transparent;
+  font-weight: 900;
+}
+
+.admin-category-tabs button.is-active {
+  color: #fff;
+  background: var(--maroon);
+}
+
+.admin-section-heading {
+  padding: 4px 2px;
+}
+
+.admin-section-heading h3 {
+  margin: 0;
+  font-size: clamp(28px, 3vw, 42px);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.admin-section-heading p {
+  margin: 8px 0 0;
+  color: rgba(11, 19, 37, 0.64);
 }
 
 .admin-login-form button,
@@ -2338,6 +2385,12 @@ th {
 
   .admin-actions {
     display: grid;
+  }
+
+  .admin-category-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    border-radius: 22px;
   }
 
   .admin-actions button,
