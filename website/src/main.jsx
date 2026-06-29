@@ -43,7 +43,7 @@ const pages = [
   ["downloads", "Downloads"],
   ["contact", "Contact"],
 ];
-const validPageSlugs = new Set([...pages.map(([slug]) => slug), "login"]);
+const validPageSlugs = new Set([...pages.map(([slug]) => slug), "login", "admin"]);
 
 const stats = [
   [520, "+", "Learners supported across early years and primary classes"],
@@ -269,8 +269,42 @@ function App() {
   const [page, setPage] = useState(() => getInitialPage());
   const [menuOpen, setMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [websiteEvents, setWebsiteEvents] = useState(events);
 
   useRevealAnimation(page);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadEvents() {
+      try {
+        const response = await fetch("/api/events");
+        if (!response.ok) return;
+        const body = await response.json();
+        const nextEvents = Array.isArray(body.data)
+          ? body.data.map((event) => [event.date, event.title, event.description])
+          : [];
+        if (isMounted && nextEvents.length) setWebsiteEvents(nextEvents);
+      } catch {
+        // Keep the built-in events if the website API is not configured yet.
+      }
+    }
+
+    loadEvents();
+
+    const onEventsUpdated = (event) => {
+      const nextEvents = event.detail?.events;
+      if (Array.isArray(nextEvents) && nextEvents.length) {
+        setWebsiteEvents(nextEvents.map((item) => [item.date, item.title, item.description]));
+      }
+    };
+
+    window.addEventListener("website-events-updated", onEventsUpdated);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("website-events-updated", onEventsUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     const onPopState = () => setPage(getInitialPage());
@@ -305,7 +339,7 @@ function App() {
           onClose={() => setMenuOpen(false)}
         />
       )}
-      <PageRouter page={page} onNavigate={navigate} />
+      <PageRouter page={page} onNavigate={navigate} events={websiteEvents} />
       <SiteFooter onNavigate={navigate} />
       <button
         className="back-to-top"
@@ -526,20 +560,21 @@ function MenuOverlay({ currentPage, onNavigate, onClose }) {
   );
 }
 
-function PageRouter({ page, onNavigate }) {
+function PageRouter({ page, onNavigate, events }) {
   const route = {
-    home: <HomePage onNavigate={onNavigate} />,
+    home: <HomePage onNavigate={onNavigate} events={events} />,
     about: <AboutPage />,
     academics: <AcademicsPage />,
     admissions: <AdmissionsPage onNavigate={onNavigate} />,
     "school-life": <SchoolLifePage />,
     gallery: <GalleryPage />,
     parents: <ParentsPage />,
-    news: <NewsPage />,
+    news: <NewsPage events={events} />,
     facilities: <FacilitiesPage />,
     downloads: <DownloadsPage />,
     contact: <ContactPage />,
     login: <DummyLoginPage />,
+    admin: <WebsiteAdminPage />,
   };
 
   return route[page] || <HomePage onNavigate={onNavigate} />;
@@ -554,14 +589,14 @@ function SlidingButton({ children, onClick, variant = "light" }) {
   );
 }
 
-function HomePage({ onNavigate }) {
+function HomePage({ onNavigate, events }) {
   return (
     <>
       <Hero onNavigate={onNavigate} />
       <HighlightMarquee />
       <StatsSection />
       <WhyChooseUs />
-      <NewsEventsBlock onNavigate={onNavigate} />
+      <NewsEventsBlock onNavigate={onNavigate} events={events} />
       <Testimonials />
       <CallToAction onNavigate={onNavigate} />
     </>
@@ -689,7 +724,7 @@ function WhyChooseUs() {
   );
 }
 
-function NewsEventsBlock({ onNavigate }) {
+function NewsEventsBlock({ onNavigate, events }) {
   return (
     <section id="news-preview" className="split-section">
       <div data-reveal>
@@ -976,12 +1011,25 @@ function ParentsPage() {
   );
 }
 
-function NewsPage() {
+function NewsPage({ events }) {
   return (
     <SubPage
       eyebrow="News & Events"
       title="Announcements, activities, and school stories."
     >
+      <div className="events-card news-events-card" data-reveal>
+        <CalendarDays size={28} />
+        <h2>Upcoming Events</h2>
+        {events.map(([date, title, text]) => (
+          <article key={title}>
+            <strong>{date}</strong>
+            <div>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </div>
+          </article>
+        ))}
+      </div>
       <div className="article-grid">
         {news.concat(news).map(([title, date, category, text], index) => (
           <article key={`${title}-${index}`} data-reveal>
@@ -1151,6 +1199,205 @@ function DummyLoginPage() {
             Login coming soon
           </button>
         </form>
+      </section>
+    </SubPage>
+  );
+}
+
+function WebsiteAdminPage() {
+  const [password, setPassword] = useState("");
+  const [token, setToken] = useState(() =>
+    window.localStorage.getItem("brooks_website_admin_token") || "",
+  );
+  const [adminEvents, setAdminEvents] = useState(
+    events.map(([date, title, description]) => ({ date, title, description })),
+  );
+  const [status, setStatus] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let isMounted = true;
+
+    async function loadAdminEvents() {
+      setStatus("Loading events...");
+      try {
+        const response = await fetch("/api/admin-events", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Could not load events.");
+        if (isMounted) {
+          setAdminEvents(body.data);
+          setStatus("");
+        }
+      } catch (error) {
+        if (isMounted) setStatus(error.message);
+      }
+    }
+
+    loadAdminEvents();
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
+  const login = async (event) => {
+    event.preventDefault();
+    setStatus("Checking password...");
+    try {
+      const response = await fetch("/api/admin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Could not log in.");
+      window.localStorage.setItem("brooks_website_admin_token", body.token);
+      setToken(body.token);
+      setPassword("");
+      setStatus("");
+    } catch (error) {
+      setStatus(error.message);
+    }
+  };
+
+  const updateEvent = (index, field, value) => {
+    setAdminEvents((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
+  const addEvent = () => {
+    setAdminEvents((current) => [
+      ...current,
+      { date: "", title: "", description: "" },
+    ]);
+  };
+
+  const removeEvent = (index) => {
+    setAdminEvents((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const saveEvents = async (event) => {
+    event.preventDefault();
+    setIsSaving(true);
+    setStatus("Saving events...");
+    try {
+      const response = await fetch("/api/admin-events", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ events: adminEvents }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Could not save events.");
+      setAdminEvents(body.data);
+      window.dispatchEvent(
+        new CustomEvent("website-events-updated", {
+          detail: { events: body.data },
+        }),
+      );
+      setStatus("Events saved. The public website will now show the new list.");
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const logout = () => {
+    window.localStorage.removeItem("brooks_website_admin_token");
+    setToken("");
+    setStatus("");
+  };
+
+  return (
+    <SubPage eyebrow="Website Admin" title="Update public website events.">
+      <section className="website-admin-panel">
+        <div className="admin-intro" data-reveal>
+          <img src={logo} alt="Brooks School logo" />
+          <h2>Upcoming Events Editor</h2>
+          <p>
+            This page is separate from the school management app. It is only for
+            updating public website content like upcoming events.
+          </p>
+        </div>
+
+        {!token ? (
+          <form className="admin-login-form" onSubmit={login} data-reveal>
+            <label>
+              Website admin password
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter password"
+                required
+              />
+            </label>
+            <button type="submit">Log in</button>
+            {status ? <p className="admin-status">{status}</p> : null}
+          </form>
+        ) : (
+          <form className="events-editor" onSubmit={saveEvents} data-reveal>
+            {adminEvents.map((item, index) => (
+              <article key={`${item.title}-${index}`}>
+                <div>
+                  <span>Event {index + 1}</span>
+                  <button type="button" onClick={() => removeEvent(index)}>
+                    Remove
+                  </button>
+                </div>
+                <label>
+                  Date
+                  <input
+                    value={item.date}
+                    onChange={(event) => updateEvent(index, "date", event.target.value)}
+                    placeholder="02 Jul"
+                    required
+                  />
+                </label>
+                <label>
+                  Title
+                  <input
+                    value={item.title}
+                    onChange={(event) => updateEvent(index, "title", event.target.value)}
+                    placeholder="Parent consultation morning"
+                    required
+                  />
+                </label>
+                <label>
+                  Description
+                  <textarea
+                    value={item.description}
+                    onChange={(event) =>
+                      updateEvent(index, "description", event.target.value)
+                    }
+                    placeholder="Short event description"
+                    required
+                  />
+                </label>
+              </article>
+            ))}
+            <div className="admin-actions">
+              <button type="button" onClick={addEvent}>
+                Add event
+              </button>
+              <button type="submit" disabled={isSaving}>
+                {isSaving ? "Saving..." : "Publish events"}
+              </button>
+              <button type="button" onClick={logout}>
+                Log out
+              </button>
+            </div>
+            {status ? <p className="admin-status">{status}</p> : null}
+          </form>
+        )}
       </section>
     </SubPage>
   );
