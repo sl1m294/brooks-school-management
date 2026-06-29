@@ -29,6 +29,9 @@ import "./styles.css";
 const logo = "/assets/brooks-logo-transparent.png";
 const heroImage =
   "https://images.unsplash.com/photo-1620969910995-4bbe4eaa32c1?auto=format&fit=crop&fm=jpg&q=82&w=1800";
+const ADMIN_TOKEN_KEY = "brooks_website_admin_token";
+const ADMIN_LAST_ACTIVE_KEY = "brooks_website_admin_last_active";
+const ADMIN_INACTIVITY_LIMIT_MS = 1000 * 60 * 30;
 
 const pages = [
   ["home", "Home"],
@@ -1240,9 +1243,18 @@ function DummyLoginPage() {
 
 function WebsiteAdminPage() {
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState(() =>
-    window.localStorage.getItem("brooks_website_admin_token") || "",
-  );
+  const [token, setToken] = useState(() => {
+    const storedToken = window.localStorage.getItem(ADMIN_TOKEN_KEY) || "";
+    const lastActive = Number(window.localStorage.getItem(ADMIN_LAST_ACTIVE_KEY) || 0);
+
+    if (storedToken && Date.now() - lastActive <= ADMIN_INACTIVITY_LIMIT_MS) {
+      return storedToken;
+    }
+
+    window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+    window.localStorage.removeItem(ADMIN_LAST_ACTIVE_KEY);
+    return "";
+  });
   const [activeEditor, setActiveEditor] = useState("events");
   const [adminEvents, setAdminEvents] = useState(
     events.map(([date, title, description]) => ({ date, title, description })),
@@ -1297,6 +1309,37 @@ function WebsiteAdminPage() {
     };
   }, [token]);
 
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const markActive = () => {
+      window.localStorage.setItem(ADMIN_LAST_ACTIVE_KEY, String(Date.now()));
+    };
+    const expireIfInactive = () => {
+      const lastActive = Number(window.localStorage.getItem(ADMIN_LAST_ACTIVE_KEY) || 0);
+      if (Date.now() - lastActive <= ADMIN_INACTIVITY_LIMIT_MS) return;
+
+      window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+      window.localStorage.removeItem(ADMIN_LAST_ACTIVE_KEY);
+      setToken("");
+      setStatus("Logged out after 30 minutes of inactivity.");
+    };
+    const activityEvents = ["click", "keydown", "mousemove", "scroll", "touchstart"];
+
+    markActive();
+    activityEvents.forEach((activityEvent) => {
+      window.addEventListener(activityEvent, markActive, { passive: true });
+    });
+    const expiryTimer = window.setInterval(expireIfInactive, 60 * 1000);
+
+    return () => {
+      activityEvents.forEach((activityEvent) => {
+        window.removeEventListener(activityEvent, markActive);
+      });
+      window.clearInterval(expiryTimer);
+    };
+  }, [token]);
+
   const login = async (event) => {
     event.preventDefault();
     setStatus("Checking password...");
@@ -1308,7 +1351,8 @@ function WebsiteAdminPage() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not log in.");
-      window.localStorage.setItem("brooks_website_admin_token", body.token);
+      window.localStorage.setItem(ADMIN_TOKEN_KEY, body.token);
+      window.localStorage.setItem(ADMIN_LAST_ACTIVE_KEY, String(Date.now()));
       setToken(body.token);
       setPassword("");
       setStatus("");
@@ -1414,7 +1458,8 @@ function WebsiteAdminPage() {
   };
 
   const logout = () => {
-    window.localStorage.removeItem("brooks_website_admin_token");
+    window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+    window.localStorage.removeItem(ADMIN_LAST_ACTIVE_KEY);
     setToken("");
     setStatus("");
   };
