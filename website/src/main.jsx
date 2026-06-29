@@ -1669,7 +1669,7 @@ function SubPage({ eyebrow, title, children }) {
           <h1>{title}</h1>
         </div>
       </section>
-      <div className="subpage-content">{children}</div>
+      <div className={`subpage-content ${pageClassName}-content`}>{children}</div>
     </>
   );
 }
