@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -354,38 +355,41 @@ function App() {
   };
 
   return (
-    <main className={darkMode ? "site-shell dark-mode" : "site-shell"}>
-      <Navigation
-        currentPage={page}
-        currentLabel={currentLabel}
-        menuOpen={menuOpen}
-        onMenuToggle={() => setMenuOpen((value) => !value)}
-        onNavigate={navigate}
-        darkMode={darkMode}
-        onToggleTheme={() => setDarkMode((value) => !value)}
-      />
-      {menuOpen && (
-        <MenuOverlay
+    <>
+      <main className={darkMode ? "site-shell dark-mode" : "site-shell"}>
+        <Navigation
           currentPage={page}
+          currentLabel={currentLabel}
+          menuOpen={menuOpen}
+          onMenuToggle={() => setMenuOpen((value) => !value)}
           onNavigate={navigate}
-          onClose={() => setMenuOpen(false)}
+          darkMode={darkMode}
+          onToggleTheme={() => setDarkMode((value) => !value)}
         />
-      )}
-      <PageRouter
-        page={page}
-        onNavigate={navigate}
-        events={websiteEvents}
-        news={websiteNews}
-      />
-      <SiteFooter onNavigate={navigate} />
-      <button
-        className="back-to-top"
-        aria-label="Back to top"
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      >
-        <ArrowRight size={18} />
-      </button>
-    </main>
+        {menuOpen && (
+          <MenuOverlay
+            currentPage={page}
+            onNavigate={navigate}
+            onClose={() => setMenuOpen(false)}
+          />
+        )}
+        <PageRouter
+          page={page}
+          onNavigate={navigate}
+          events={websiteEvents}
+          news={websiteNews}
+        />
+        <SiteFooter onNavigate={navigate} />
+        <button
+          className="back-to-top"
+          aria-label="Back to top"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        >
+          <ArrowRight size={18} />
+        </button>
+      </main>
+      <Analytics />
+    </>
   );
 }
 
